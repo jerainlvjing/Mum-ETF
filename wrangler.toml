@@ -1,0 +1,23 @@
+name = "etf-shares"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 数据库绑定（database_id 由 `wrangler d1 create etf-shares` 生成后填到这里）
+[[d1_databases]]
+binding = "DB"
+database_name = "etf-shares"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# 前端静态资源（index.html 等）
+[assets]
+directory = "./static"
+binding = "ASSETS"
+
+# 定时任务：每个交易日（周一~周五）北京时间 23:30（= UTC 15:30）自动抓取
+[triggers]
+crons = ["30 15 * * 1-5"]
+
+[vars]
+ETF_CODES = "510300,510310,512100,159845,159915,560010,588080,510500,159919,512500,510330,510180,588000,510050"
+BACKFILL_DAYS = "90"

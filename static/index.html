@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>国家队主力持仓ETF每日份额变化</title>
+  <style>
+    :root {
+      --bg: #f5f6f8; --card: #fff; --border: #e5e7eb; --text: #1f2329; --text-sub: #8a919f;
+      --up: #d93a2b; --down: #0f9d58; --brand: #2563eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px 20px 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 20px; font-weight: 700; }
+    .title-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .sub { font-size: 13px; color: var(--text-sub); }
+    .toolbar { display: flex; align-items: center; gap: 10px; }
+    button { border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    button:hover { border-color: var(--brand); color: var(--brand); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+    .card h2 { font-size: 15px; font-weight: 600; }
+    .card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .hint { font-size: 12px; color: var(--text-sub); }
+
+    .chart-wrap { display: flex; gap: 14px; }
+    #chart { flex: 1; min-width: 0; height: calc(100vh - 220px); min-height: 680px; max-height: 1000px; }
+    #side {
+      width: 400px; max-height: calc(100vh - 220px); min-height: 680px; overflow-y: auto;
+      border-left: 1px solid var(--border); padding-left: 14px; font-size: 12px;
+    }
+    .side-head {
+      display: grid; grid-template-columns: 1fr 92px 102px; gap: 4px; align-items: center;
+      padding: 0 8px 8px; margin-bottom: 2px;
+      font-size: 12px; color: var(--text-sub); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: #fff; z-index: 2;
+    }
+    .hd-share, .hd-mv { text-align: right; white-space: nowrap; }
+    .sortable { cursor: pointer; user-select: none; }
+    .sortable:hover { color: var(--brand); }
+    .sortable.active { color: var(--brand); font-weight: 600; }
+    .side-item {
+      display: grid; grid-template-columns: 1fr 92px 102px; gap: 4px; align-items: center;
+      padding: 6px 8px; cursor: pointer; border-radius: 6px;
+    }
+    .side-item:hover { background: #f2f5ff; }
+    .name-cell { display: flex; align-items: flex-start; gap: 7px; min-width: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .name-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .code { font-size: 11px; color: var(--text-sub); font-variant-numeric: tabular-nums; }
+    .share-cell, .mv-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .share { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mv { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .chg { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--text-sub); }
+    .empty { text-align: center; color: var(--text-sub); padding: 60px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-row">
+        <h1>国家队主力持仓ETF每日份额变化</h1>
+        <span class="sub" id="subtitle">数据源：上交所 / 深交所 · 每个交易日收盘后自动记录</span>
+      </div>
+      <div class="toolbar">
+        <span class="sub" id="latestDate">--</span>
+        <button id="backfillBtn" title="回填最近90个交易日的历史份额">回填历史</button>
+        <button id="collectBtn" title="立即抓取一次最新份额">立即抓取</button>
+        <button id="refreshBtn">刷新</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>份额变化趋势</h2>
+        <span class="hint">曲线为每只ETF最近90个交易日的份额变化情况 · 鼠标悬停右侧ETF名称可高亮显示对应ETF的曲线</span>
+      </div>
+      <div class="chart-wrap">
+        <div id="chart"></div>
+        <div id="side"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script>
+    const PALETTE = ['#d93a2b','#1f6feb','#0f9d58','#7c3aed','#e08a00','#06b6d4','#db2777','#475569','#a16207','#2563eb','#16a34a','#9333ea','#dc2626','#0891b2'];
+
+    let chart = null;
+    let seriesList = [];
+    let sortField = 'share';
+    let sortDesc = true;
+
+    async function load() {
+      const res = await fetch('/api/shares');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }
+
+    function fmtShare(v) { return v == null ? '--' : (v / 1e8).toFixed(2); }
+    function fmtMv(v) { return v == null ? '--' : (v / 1e8).toFixed(2); }
+
+    function lastVal(it, field) {
+      const arr = field === 'share' ? it.shares : it.mvs;
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (arr[i] != null) return arr[i];
+      }
+      return null;
+    }
+
+    function render(rows) {
+      if (!rows.length) {
+        document.getElementById('chart').innerHTML = '<div class="empty">暂无数据，点右上角「回填历史」灌入数据</div>';
+        document.getElementById('side').innerHTML = '';
+        return;
+      }
+      const map = {};
+      rows.forEach((r) => {
+        if (!map[r.code]) map[r.code] = { code: r.code, name: r.name, dates: [], shares: [], mvs: [] };
+        map[r.code].dates.push(r.date);
+        map[r.code].shares.push(r.total_share);
+        map[r.code].mvs.push(r.market_value);
+      });
+      seriesList = Object.values(map).sort((a, b) => (lastVal(b, 'share') || 0) - (lastVal(a, 'share') || 0));
+      seriesList.forEach((it, i) => { it.seriesIndex = i; });
+      const dates = seriesList.length ? seriesList[0].dates : [];
+
+      if (!chart) chart = echarts.init(document.getElementById('chart'));
+      chart.setOption({
+        tooltip: {
+          trigger: 'axis',
+          formatter: (params) => {
+            if (!params || !params.length) return '';
+            let html = `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;margin-bottom:4px;color:#8a919f">
+              <span>${params[0].axisValue}</span>
+              <span>份额(亿份)</span>
+            </div>`;
+            params.slice().sort((a, b) => b.value - a.value).forEach((p) => {
+              html += `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;margin:2px 0">
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.seriesName}</span>
+                <span style="font-weight:600">${p.value}亿份</span></div>`;
+            });
+            return html;
+          },
+        },
+        grid: { left: 70, right: 20, top: 34, bottom: 30 },
+        xAxis: { type: 'category', data: dates, axisLabel: { color: '#8a919f', fontSize: 11 }, axisLine: { lineStyle: { color: '#d4d7dc' } } },
+        yAxis: { type: 'value', name: '亿份', nameGap: 12, nameTextStyle: { color: '#8a919f', fontSize: 11 }, axisLabel: { color: '#8a919f', fontSize: 11 }, splitLine: { lineStyle: { color: '#f0f1f3' } } },
+        series: seriesList.map((it, i) => ({
+          name: it.name + '(' + it.code + ')',
+          type: 'line',
+          data: it.shares.map((v) => (v == null ? null : +(v / 1e8).toFixed(2))),
+          showSymbol: false,
+          lineStyle: { width: 1.5 },
+          itemStyle: { color: PALETTE[i % PALETTE.length] },
+          emphasis: { focus: 'series', lineStyle: { width: 2.5 } },
+          blur: { lineStyle: { opacity: 0.12 } },
+        })),
+      });
+
+      document.getElementById('latestDate').textContent = '最新数据：' + rows[rows.length - 1].date;
+      renderSide();
+    }
+
+    function renderSide() {
+      const sorted = [...seriesList].sort((a, b) => {
+        const av = lastVal(a, sortField) ?? -Infinity;
+        const bv = lastVal(b, sortField) ?? -Infinity;
+        return sortDesc ? bv - av : av - bv;
+      });
+      const arrow = (f) => (f === sortField ? (sortDesc ? ' ▼' : ' ▲') : '');
+      document.getElementById('side').innerHTML = `
+        <div class="side-head">
+          <span class="hd-name">ETF名称</span>
+          <span class="hd-share sortable${sortField === 'share' ? ' active' : ''}" data-field="share">份额(亿份)${arrow('share')}</span>
+          <span class="hd-mv sortable${sortField === 'mv' ? ' active' : ''}" data-field="mv">流通市值(亿元)${arrow('mv')}</span>
+        </div>
+      ` + sorted.map((it) => {
+        const cur = lastVal(it, 'share');
+        const prev = it.shares.length > 1 ? it.shares[it.shares.length - 2] : null;
+        const curMv = lastVal(it, 'mv');
+        let chgHtml = '<span class="chg flat">--</span>';
+        if (prev != null && cur != null) {
+          const diff = (cur - prev) / 1e8;
+          const pct = prev ? (diff / (prev / 1e8)) * 100 : 0;
+          const sign = diff > 0 ? '+' : '';
+          const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+          chgHtml = `<span class="chg ${cls}">${sign}${diff.toFixed(2)} (${sign}${pct.toFixed(2)}%)</span>`;
+        }
+        return `<div class="side-item" data-series-index="${it.seriesIndex}">
+          <span class="name-cell"><span class="dot" style="background:${PALETTE[it.seriesIndex % PALETTE.length]}"></span><span class="name-wrap"><span class="name" title="${it.name}">${it.name}</span><span class="code">${it.code}</span></span></span>
+          <span class="share-cell"><span class="share">${fmtShare(cur)}</span>${chgHtml}</span>
+          <span class="mv-cell"><span class="mv">${fmtMv(curMv)}</span></span>
+        </div>`;
+      }).join('');
+    }
+
+    async function refresh() {
+      try {
+        const rows = await load();
+        render(rows);
+      } catch (e) {
+        document.getElementById('chart').innerHTML = '<div class="empty">加载失败：' + e.message + '</div>';
+      }
+    }
+
+    const side = document.getElementById('side');
+    side.addEventListener('click', (e) => {
+      const th = e.target.closest('.sortable');
+      if (!th) return;
+      const field = th.dataset.field;
+      if (sortField === field) sortDesc = !sortDesc;
+      else { sortField = field; sortDesc = true; }
+      renderSide();
+    });
+    side.addEventListener('mouseover', (e) => {
+      const item = e.target.closest('.side-item');
+      if (!item || !chart) return;
+      chart.dispatchAction({ type: 'highlight', seriesIndex: +item.dataset.seriesIndex });
+    });
+    side.addEventListener('mouseout', (e) => {
+      const item = e.target.closest('.side-item');
+      if (!item || !chart) return;
+      chart.dispatchAction({ type: 'downplay', seriesIndex: +item.dataset.seriesIndex });
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', refresh);
+    document.getElementById('collectBtn').addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/collect', { method: 'POST' });
+        const j = await r.json();
+        alert('抓取完成：' + j.date + ' 记录 ' + j.count + ' 只 ETF');
+        refresh();
+      } catch (e) { alert('抓取失败：' + e.message); }
+    });
+    document.getElementById('backfillBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('backfillBtn');
+      try {
+        btn.disabled = true;
+        btn.textContent = '回填中...';
+        for (let i = 0; i < 3; i++) {
+          const r = await fetch('/api/backfill', { method: 'POST' });
+          const j = await r.json();
+          if (j.done) break;
+        }
+        alert('历史回填完成');
+        refresh();
+      } catch (e) {
+        alert('回填失败：' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '回填历史';
+      }
+    });
+
+    window.addEventListener('resize', () => chart && chart.resize());
+    refresh();
+  </script>
+</body>
+</html>

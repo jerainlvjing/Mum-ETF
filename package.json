@@ -1,0 +1,9 @@
+{
+  "name": "etf-shares-cf",
+  "version": "1.0.0",
+  "private": true,
+  "description": "国家队主力持仓ETF每日份额变化 - Cloudflare Workers + D1 版",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
