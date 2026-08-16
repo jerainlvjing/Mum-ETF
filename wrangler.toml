@@ -5,9 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 
 # D1 数据库绑定（database_id 由 `wrangler d1 create etf-shares` 生成后填到这里）
 [[d1_databases]]
-binding = "DB"
+binding = "etf-shares"
 database_name = "etf-shares"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "79f771f4-750c-4fe8-be8b-68f8a073d3ff"
 
 # 前端静态资源（index.html 等）
 [assets]
