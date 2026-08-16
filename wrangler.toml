@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "etf-shares"
 database_name = "etf-shares"
-database_id = "79f771f4-750c-4fe8-be8b-68f8a073d3ff"
+database_id = ""
 
 # 前端静态资源（index.html 等）
 [assets]
